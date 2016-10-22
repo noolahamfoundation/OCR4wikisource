@@ -57,7 +57,7 @@ latest_version =  urllib2.urlopen('https://raw.githubusercontent.com/tshrinivasa
 
 if not float(version) == float(latest_version):
             logger.info("\n\nYour OCR4WikiSource version is " + version + ". This is old. The latest version is " + latest_version + ". Update from https://github.com/tshrinivasan/OCR4wikisource \n\n")
-            sys.exit()
+            #sys.exit()
 
 
 
@@ -84,6 +84,7 @@ wiki_username = config.get('settings','wiki_username')
 wiki_password = config.get('settings','wiki_password')
 wikisource_language_code = config.get('settings','wikisource_language_code')
 keep_temp_folder_in_google_drive = config.get('settings','keep_temp_folder_in_google_drive')
+title = config.get('settings','title')
 #start_page = config.get('settings','start_page')
 #end_page = config.get('settings','end_page')
 
@@ -123,27 +124,15 @@ if not os.path.isdir(temp_folder):
 
 
 if os.path.isfile(filename):
-            logging.info(filename + " Already Exists. Skipping the download.")
+            logger.info(filename + " Already Exists. Skipping the download.")
 
 else:
             print "\n\nDownloading the file " + filename + "\n\n"
-
             logger.info("Downloading the file " + filename )
-
             #Download the file
-
-            r = requests.get(url, stream=True)
-            with open(filename, 'wb') as f:
-                        total_length = int(r.headers.get('content-length'))
-                        for chunk in progress.bar(r.iter_content(chunk_size=1024), expected_size=(total_length/1024) + 1):
-                                    if chunk:
-                                                f.write(chunk)
-                                                f.flush()
-
-
+            downloadfile = urllib.URLopener()
+            downloadfile.retrieve(url, filename)            
             logger.info("Download Completed")
-
-
 
 
 # Convert djvu to PDF
@@ -389,7 +378,7 @@ elif int(columns)==2:
 		if "________________" in content:
                 	records = content.split('________________')
                 	print records
-                	for record in records[1::2]:
+                	for record in records:
                                 with open('txt_'+str(i).zfill(5)+'.txt', 'w') as towrite:
                                         towrite.write(record)
                                 i = i+1
@@ -441,20 +430,47 @@ for textfile in glob.glob('text_for_page*.txt'):
             files.sort()
 
             
-single_file = open("all_text_for_" + original_filename + ".txt" ,"w")
+# Single HTML File output
+def createSingleFileHTML(i_fileName, i_title, i_files):
+    single_file = open(os.path.splitext(i_fileName)[0] + ".html" ,"w")
+    single_file.write("<!DOCTYPE html>\n<html>\n<head>\n<meta charset='UTF-8'>")
+    single_file.write("\n<style>")
+    single_file.write("\n#notice, pre {")
+    single_file.write("\nwidth: 620px;")
+    single_file.write("\nwhite-space: pre-wrap;")
+    single_file.write("\nwhite-space: -moz-pre-wrap;")
+    single_file.write("\nwhite-space: -pre-wrap;")
+    single_file.write("\nwhite-space: -o-pre-wrap;")
+    single_file.write("\nword-wrap: break-word;")
+    single_file.write("\n}\n</style>")
+    single_file.write("\n</head>\n<body>")
+    single_file.write("\n<div id='notice'>")
+    single_file.write("\n<font face='Latha' size='2'><font color='#FF0000'>கவனிக்க: </font>")
+    single_file.write("இந்த மின்னூலைத் தனிப்பட்ட வாசிப்பு, உசாத்துணைத் தேவைகளுக்கு மட்டுமே பயன்படுத்தலாம். வேறு பயன்பாடுகளுக்கு ஆசிரியரின்/பதிப்புரிமையாளரின் அனுமதி பெறப்பட வேண்டும்.")
+    single_file.write("\n<br>இது கூகிள் எழுத்துணரியால் தானியக்கமாக உருவாக்கப்பட்ட கோப்பு.  இந்த மின்னூல் மெய்ப்புப் பார்க்கப்படவில்லை.")
+    single_file.write("\n<br>இந்தப் படைப்பின் நூலகப் பக்கத்தினை பார்வையிட பின்வரும் இணைப்புக்குச் செல்லவும்:  ")
+    single_file.write("<b><a href='http://noolaham.org/wiki/index.php/")
+    single_file.write(i_title)
+    single_file.write("' target='_blank'>" + i_title + "</a></b>")
+    single_file.write("\n</font>\n</div>\n<hr>")
+    
+    counter = 1
+    for filename in i_files:
+                content = open(filename).read()
+                single_file.write("\n<pre>")
+                single_file.write("\nPage " + str(counter))
+                single_file.write("\n")
+                single_file.write(content)
+                single_file.write("\n</pre>")
+                single_file.write("\n<hr>")            
+                counter = counter + 1
+                
+    single_file.write("</body></html>")
+    single_file.close()
 
-counter = 1
-for filename in files:
-            content = open(filename).read()
-            single_file.write("\n\n")
-            single_file.write("Page " + str(counter))
-            single_file.write("\n\n")
-            single_file.write(content)
-            single_file.write("\n\n")
-            single_file.write("xxxxxxxxxx")
-            counter = counter + 1
+    return 
 
-single_file.close()
+createSingleFileHTML(original_filename, title, files)    
                                                                 
 
 logger.info("Merged all OCRed files to  all_text_for_" + original_filename + ".txt")
@@ -492,10 +508,10 @@ if not pdf_count == result_text_count:
             logger.info(" \n\nText files are not equal to PDF files. Some PDF files not OCRed. Run this script again to complete OCR all the PDF     files \n\n")
             sys.exit()
 
-if  pdf_count == result_text_count:
-            logger.info("\n\nThe PDF files and result text files are equval. Now running the mediawiki_uploader.py script\n\n")
-            command = "python mediawiki_uploader.py"
-            os.system(command)
+#if  pdf_count == result_text_count:
+            #logger.info("\n\nThe PDF files and result text files are equval. Now running the mediawiki_uploader.py script\n\n")
+            #command = "python mediawiki_uploader.py"
+            #os.system(command)
             
 
                                         
